@@ -19,7 +19,8 @@ import com.hotels.styx.api.extension.Origin.checkThatOriginsAreDistinct
 import java.lang.IllegalArgumentException
 import java.lang.StringBuilder
 import java.net.URI
-import java.util.*
+import java.util.Objects
+import java.util.Optional
 
 /**
  * Represents the configuration of an application (i.e. a backend service) that Styx can proxy to.
@@ -388,15 +389,6 @@ class BackendService(builder: Builder) : Identifiable {
     companion object {
         const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
         const val USE_DEFAULT_MAX_HEADER_SIZE = 0
-
-        /**
-         * Creates an Application builder.
-         *
-         * @return a new builder
-         */
-        fun newBackendServiceBuilder(): Builder {
-            return Builder()
-        }
 
         /**
          * Creates an Application builder that inherits from an existing Application.

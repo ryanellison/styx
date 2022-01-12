@@ -39,34 +39,26 @@ import com.hotels.styx.client.OriginStatsFactory.CachingOriginStatsFactory
 import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
 import java.lang.StringBuilder
-import java.util.Objects
+import java.util.Objects.nonNull
+import java.util.Objects.requireNonNull
 import java.util.Optional
 
 /**
  * A configurable HTTP client that uses connection pooling, load balancing, etc.
  */
 class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
-    private val id: Id = Objects.requireNonNull(builder.backendServiceId)
-    private val stickySessionConfig: StickySessionConfig = Objects.requireNonNull(builder.stickySessionConfig)
-    private val originStatsFactory: OriginStatsFactory = Objects.requireNonNull(builder.originStatsFactory)!!
-    private val loadBalancer: LoadBalancer = Objects.requireNonNull(builder.loadBalancer)!!
+    private val id: Id = requireNonNull(builder.backendServiceId)
+    private val stickySessionConfig: StickySessionConfig = requireNonNull(builder.stickySessionConfig)
+    private val originStatsFactory: OriginStatsFactory = requireNonNull(builder.originStatsFactory)!!
+    private val loadBalancer: LoadBalancer = requireNonNull(builder.loadBalancer)!!
     private val retryPolicy: RetryPolicy = builder.retryPolicy ?: RetryNTimes(3)
     private val rewriteRuleset: RewriteRuleset = RewriteRuleset(builder.rewriteRules)
+    private val metrics: CentralisedMetrics? = builder.metrics
     private val originsRestrictionCookieName: String? = builder.originsRestrictionCookieName
     private val originIdHeader: CharSequence = builder.originIdHeader
-    private val metrics: CentralisedMetrics? = builder.metrics
     private val overrideHostHeader: Boolean = builder.overrideHostHeader
 
-    private fun shouldOverrideHostHeader(host: RemoteHost, request: LiveHttpRequest): LiveHttpRequest {
-        return if (overrideHostHeader && !host.origin().host().isNullOrBlank()) {
-            request.newBuilder().header(HttpHeaderNames.HOST, host.origin().host()).build()
-        } else request
-    }
-
-    override fun sendRequest(
-        request: LiveHttpRequest,
-        context: HttpInterceptor.Context
-    ): Publisher<LiveHttpResponse> {
+    override fun sendRequest(request: LiveHttpRequest, context: HttpInterceptor.Context): Publisher<LiveHttpResponse> {
         return sendRequest(rewriteUrl(request), emptyList(), 0, context)
     }
 
@@ -90,6 +82,12 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
     }
 
     private fun isHeadRequest(request: LiveHttpRequest): Boolean = request.method() == HttpMethod.HEAD
+
+    private fun shouldOverrideHostHeader(host: RemoteHost, request: LiveHttpRequest): LiveHttpRequest {
+        return if (overrideHostHeader && !host.origin().host().isNullOrBlank()) {
+            request.newBuilder().header(HttpHeaderNames.HOST, host.origin().host()).build()
+        } else request
+    }
 
     private fun sendRequest(
         request: LiveHttpRequest,
@@ -247,7 +245,7 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
     private fun selectOrigin(rewrittenRequest: LiveHttpRequest): Optional<RemoteHost> {
         val preferences: LoadBalancer.Preferences = object : LoadBalancer.Preferences {
             override fun preferredOrigins(): Optional<String> {
-                return if (Objects.nonNull(originsRestrictionCookieName)) {
+                return if (nonNull(originsRestrictionCookieName)) {
                     rewrittenRequest.cookie(originsRestrictionCookieName)
                         .map { obj: RequestCookie -> obj.value() }
                         .or { rewrittenRequest.cookie("styx_origin_$id").map { obj: RequestCookie -> obj.value() } }
@@ -301,7 +299,7 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
      * A builder for [StyxBackendServiceClient].
      */
     class Builder(backendServiceId: Id) {
-        val backendServiceId: Id = Objects.requireNonNull(backendServiceId)
+        val backendServiceId: Id = requireNonNull(backendServiceId)
         var metrics: CentralisedMetrics? = null
         var rewriteRules: List<RewriteRule> = emptyList()
         var retryPolicy: RetryPolicy? = RetryNTimes(3)
@@ -313,43 +311,43 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
         var overrideHostHeader: Boolean = false
 
 
-        fun stickySessionConfig(stickySessionConfig: StickySessionConfig?): Builder {
-            this.stickySessionConfig = Objects.requireNonNull(stickySessionConfig)!!
+        fun stickySessionConfig(stickySessionConfig: StickySessionConfig): Builder {
+            this.stickySessionConfig = requireNonNull(stickySessionConfig)!!
             return this
         }
 
-        fun metrics(metrics: CentralisedMetrics?): Builder {
-            this.metrics = Objects.requireNonNull(metrics)
+        fun metrics(metrics: CentralisedMetrics): Builder {
+            this.metrics = requireNonNull(metrics)
             return this
         }
 
-        fun retryPolicy(retryPolicy: RetryPolicy?): Builder {
-            this.retryPolicy = Objects.requireNonNull(retryPolicy)
+        fun retryPolicy(retryPolicy: RetryPolicy): Builder {
+            this.retryPolicy = requireNonNull(retryPolicy)
             return this
         }
 
-        fun rewriteRules(rewriteRules: List<RewriteRule>?): Builder {
+        fun rewriteRules(rewriteRules: List<RewriteRule>): Builder {
             this.rewriteRules = java.util.List.copyOf(rewriteRules)
             return this
         }
 
-        fun loadBalancer(loadBalancer: LoadBalancer?): Builder {
-            this.loadBalancer = Objects.requireNonNull(loadBalancer)
+        fun loadBalancer(loadBalancer: LoadBalancer): Builder {
+            this.loadBalancer = requireNonNull(loadBalancer)
             return this
         }
 
-        fun originStatsFactory(originStatsFactory: OriginStatsFactory?): Builder {
+        fun originStatsFactory(originStatsFactory: OriginStatsFactory): Builder {
             this.originStatsFactory = originStatsFactory
             return this
         }
 
-        fun originsRestrictionCookieName(originsRestrictionCookieName: String?): Builder {
+        fun originsRestrictionCookieName(originsRestrictionCookieName: String): Builder {
             this.originsRestrictionCookieName = originsRestrictionCookieName
             return this
         }
 
         fun originIdHeader(originIdHeader: CharSequence): Builder {
-            this.originIdHeader = Objects.requireNonNull(originIdHeader)
+            this.originIdHeader = requireNonNull(originIdHeader)
             return this
         }
 
