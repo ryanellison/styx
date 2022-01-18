@@ -18,7 +18,6 @@ import com.hotels.styx.api.extension.Origin
 import com.hotels.styx.api.extension.Origin.checkThatOriginsAreDistinct
 import java.lang.IllegalArgumentException
 import java.lang.StringBuilder
-import java.net.URI
 import java.util.Objects
 import java.util.Optional
 
@@ -30,13 +29,13 @@ class BackendService(
     private val path: String,
     private val connectionPoolSettings: ConnectionPoolSettings,
     private val origins: Set<Origin>,
-    private val healthCheckConfig: HealthCheckConfig,
+    private val healthCheckConfig: HealthCheckConfig?,
     private val stickySessionConfig: StickySessionConfig,
     private val rewrites: List<RewriteConfig>,
     private val overrideHostHeader: Boolean,
     private val responseTimeoutMillis: Int,
     private val maxHeaderSize: Int,
-    private val tlsSettings: TlsSettings
+    private val tlsSettings: TlsSettings?
 ) : Identifiable {
     /**
      * A protocol used for the backend service. This can be either HTTP or HTTPS.
@@ -53,120 +52,40 @@ class BackendService(
     }
 
     private constructor(builder: Builder): this(
-        id = builder.id!!,
-        path = builder.path!!,
-        connectionPoolSettings = builder.connectionPoolSettings!!,
-        origins = builder.origins!!,
-        healthCheckConfig = builder.healthCheckConfig!!,
-        stickySessionConfig = builder.stickySessionConfig!!,
-        rewrites = builder.rewrites!!,
-        overrideHostHeader = builder.overrideHostHeader!!,
-        responseTimeoutMillis = builder.responseTimeoutMillis!!,
-        maxHeaderSize = builder.maxHeaderSize!!,
-        tlsSettings = builder.tlsSettings!!
+        id = builder.id,
+        path = builder.path,
+        connectionPoolSettings = builder.connectionPoolSettings,
+        origins = builder.origins,
+        healthCheckConfig = builder.healthCheckConfig,
+        stickySessionConfig = builder.stickySessionConfig,
+        rewrites = builder.rewrites,
+        overrideHostHeader = builder.overrideHostHeader,
+        responseTimeoutMillis = builder.responseTimeoutMillis,
+        maxHeaderSize = builder.maxHeaderSize,
+        tlsSettings = builder.tlsSettings
     )
+
+    companion object {
+        const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
+        const val USE_DEFAULT_MAX_HEADER_SIZE = 0
+        inline fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
+    }
 
     /**
      * A builder for [BackendService].
      */
     class Builder {
-        var id: Id? = Id.GENERIC_APP
-            private set
-        var path: String? = "/"
-            private set
-        var origins: Set<Origin>? = emptySet()
-            private set
-        var connectionPoolSettings: ConnectionPoolSettings? = ConnectionPoolSettings.defaultConnectionPoolSettings()
-            private set
-        var stickySessionConfig: StickySessionConfig? = StickySessionConfig.stickySessionDisabled()
-            private set
+        var id: Id = Id.GENERIC_APP
+        var path: String = "/"
+        var origins: Set<Origin> = emptySet()
+        var connectionPoolSettings: ConnectionPoolSettings = ConnectionPoolSettings.defaultConnectionPoolSettings()
+        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled()
         var healthCheckConfig: HealthCheckConfig? = null
-            private set
-        var rewrites: List<RewriteConfig>? = emptyList()
-            private set
-        var overrideHostHeader: Boolean? = false
-            private set
-        var responseTimeoutMillis: Int? = DEFAULT_RESPONSE_TIMEOUT_MILLIS
-            private set
-        var maxHeaderSize: Int? = USE_DEFAULT_MAX_HEADER_SIZE
-            private set
+        var rewrites: List<RewriteConfig> = emptyList()
+        var overrideHostHeader: Boolean = false
+        var responseTimeoutMillis: Int = DEFAULT_RESPONSE_TIMEOUT_MILLIS
+        var maxHeaderSize: Int = USE_DEFAULT_MAX_HEADER_SIZE
         var tlsSettings: TlsSettings? = null
-            private set
-
-
-        fun id(id: Id) = apply {
-            this.id = id
-        }
-
-        fun path(path: String) = apply {
-            this.path = checkValidPath(path)
-        }
-
-        private fun checkValidPath(path: String): String {
-            return try {
-                URI.create(path)
-                path
-            } catch (cause: Throwable) {
-                val message = String.format("Invalid path. Path='%s'", path)
-                throw IllegalArgumentException(message, cause)
-            }
-        }
-
-        fun origins(origins: Set<Origin>) = apply {
-            this.origins = origins
-        }
-
-        fun connectionPoolConfig(connectionPoolSettings: ConnectionPoolSettings) = apply {
-            this.connectionPoolSettings = connectionPoolSettings
-        }
-
-        fun stickySessionConfig(stickySessionConfig: StickySessionConfig) = apply {
-            this.stickySessionConfig = stickySessionConfig
-        }
-
-        fun healthCheckConfig(healthCheckConfig: HealthCheckConfig) = apply {
-            this.healthCheckConfig = healthCheckConfig
-        }
-
-        fun rewrites(rewrites: List<RewriteConfig>) = apply {
-            this.rewrites = rewrites
-        }
-
-        fun overrideHostHeader(overrideHostHeader: Boolean) = apply {
-            this.overrideHostHeader = overrideHostHeader
-        }
-
-        fun responseTimeoutMillis(timeout: Int) = apply {
-            this.responseTimeoutMillis = timeout
-        }
-
-        fun maxHeaderSize(maxHeaderSize: Int) = apply {
-            this.maxHeaderSize = maxHeaderSize
-        }
-
-        /**
-         * Sets the https settings.
-         * For Jackson JSON serialiser that de-serialises from Option&lt;TlsSettings&gt;.
-         */
-        fun https(tlsSettings: Optional<TlsSettings?>) = apply {
-            this.tlsSettings = tlsSettings.orElse(null)
-        }
-
-        /**
-         * Sets the https settings.
-         * For programmatic use
-         */
-        fun httpsOld(tlsSettings: TlsSettings?) = apply {
-            this.tlsSettings = tlsSettings
-        }
-
-        /**
-         * Sets the https settings.
-         * For programmatic use
-         */
-        fun https(tlsSettings: TlsSettings?) = apply {
-            this.tlsSettings = tlsSettings
-        }
 
         fun build() = BackendService(this)
     }
@@ -190,7 +109,7 @@ class BackendService(
     fun connectionPoolConfig(): ConnectionPoolSettings = connectionPoolSettings
 
 
-    fun healthCheckConfig(): HealthCheckConfig = healthCheckConfig
+    fun healthCheckConfig(): HealthCheckConfig? = healthCheckConfig
 
 
     fun stickySessionConfig(): StickySessionConfig = stickySessionConfig
@@ -271,10 +190,5 @@ class BackendService(
             .append(tlsSettings)
             .append('}')
             .toString()
-    }
-
-    companion object {
-        const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
-        const val USE_DEFAULT_MAX_HEADER_SIZE = 0
     }
 }
