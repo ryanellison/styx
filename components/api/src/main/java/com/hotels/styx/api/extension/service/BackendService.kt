@@ -65,27 +65,35 @@ class BackendService(
         tlsSettings = builder.tlsSettings
     )
 
-    companion object {
-        const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
-        const val USE_DEFAULT_MAX_HEADER_SIZE = 0
-        inline fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
-    }
-
     /**
      * A builder for [BackendService].
      */
-    class Builder {
-        var id: Id = Id.GENERIC_APP
-        var path: String = "/"
-        var origins: Set<Origin> = emptySet()
-        var connectionPoolSettings: ConnectionPoolSettings = ConnectionPoolSettings.defaultConnectionPoolSettings()
-        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled()
-        var healthCheckConfig: HealthCheckConfig? = null
-        var rewrites: List<RewriteConfig> = emptyList()
-        var overrideHostHeader: Boolean = false
-        var responseTimeoutMillis: Int = DEFAULT_RESPONSE_TIMEOUT_MILLIS
-        var maxHeaderSize: Int = USE_DEFAULT_MAX_HEADER_SIZE
+    class Builder(
+        var id: Id = Id.GENERIC_APP,
+        var path: String = "/",
+        var origins: Set<Origin> = emptySet(),
+        var connectionPoolSettings: ConnectionPoolSettings = ConnectionPoolSettings.defaultConnectionPoolSettings(),
+        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled(),
+        var healthCheckConfig: HealthCheckConfig? = null,
+        var rewrites: List<RewriteConfig> = emptyList(),
+        var overrideHostHeader: Boolean = false,
+        var responseTimeoutMillis: Int = DEFAULT_RESPONSE_TIMEOUT_MILLIS,
+        var maxHeaderSize: Int = USE_DEFAULT_MAX_HEADER_SIZE,
         var tlsSettings: TlsSettings? = null
+    ) {
+        constructor(backendService: BackendService): this() {
+            this.id = backendService.id
+            this.path = backendService.path
+            this.origins = backendService.origins
+            this.connectionPoolSettings = backendService.connectionPoolSettings
+            this.stickySessionConfig = backendService.stickySessionConfig
+            this.healthCheckConfig = backendService.healthCheckConfig
+            this.rewrites = backendService.rewrites
+            this.overrideHostHeader = backendService.overrideHostHeader
+            this.responseTimeoutMillis = backendService.responseTimeoutMillis
+            this.maxHeaderSize = backendService.maxHeaderSize
+            this.tlsSettings = backendService.tlsSettings
+        }
 
         fun build() = BackendService(this)
     }
@@ -169,6 +177,10 @@ class BackendService(
                 && maxHeaderSize == other.maxHeaderSize)
     }
 
+    fun newCopy(): Builder {
+        return Builder(this)
+    }
+
     override fun toString(): String {
         return StringBuilder(128)
             .append(this.javaClass.simpleName)
@@ -190,5 +202,20 @@ class BackendService(
             .append(tlsSettings)
             .append('}')
             .toString()
+    }
+
+    companion object {
+        const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
+        const val USE_DEFAULT_MAX_HEADER_SIZE = 0
+
+        inline fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
+
+        fun newBackendServiceBuilder(): Builder {
+            return Builder()
+        }
+
+        fun newBackendServiceBuilder(backendService: BackendService): Builder {
+            return Builder(backendService)
+        }
     }
 }

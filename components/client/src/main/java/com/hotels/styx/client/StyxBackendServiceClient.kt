@@ -82,18 +82,17 @@ class StyxBackendServiceClient(
      * A builder for [StyxBackendServiceClient].
      */
     class Builder(
-        val id: Id,
-        val originStatsFactory: OriginStatsFactory,
-        val loadBalancer: LoadBalancer,
-        val metrics: CentralisedMetrics
+        var id: Id,
+        var originStatsFactory: OriginStatsFactory,
+        var loadBalancer: LoadBalancer,
+        var metrics: CentralisedMetrics,
+        var rewriteRules: List<RewriteRule> = emptyList(),
+        var originsRestrictionCookieName: String? = null,
+        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled(),
+        var originIdHeader: CharSequence = StyxHeaderConfig.ORIGIN_ID_DEFAULT,
+        var retryPolicy: RetryPolicy = RetryNTimes(3),
+        var overrideHostHeader: Boolean = false,
     ) {
-        var rewriteRules: List<RewriteRule> = emptyList()
-        var originsRestrictionCookieName: String? = null
-        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled()
-        var originIdHeader: CharSequence = StyxHeaderConfig.ORIGIN_ID_DEFAULT
-        var retryPolicy: RetryPolicy = RetryNTimes(3)
-        var overrideHostHeader: Boolean = false
-
         fun build() = StyxBackendServiceClient(this)
     }
 
