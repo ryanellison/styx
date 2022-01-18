@@ -68,17 +68,18 @@ class StyxBackendServiceClientFactory(    // Todo: This can be package private i
             originsInventory,
             originRestrictionCookie
         )
-        return StyxBackendServiceClient.Builder(backendService.id())
-            .loadBalancer(loadBalancingStrategy)
-            .stickySessionConfig(backendService.stickySessionConfig())
-            .metrics(environment.centralisedMetrics())
-            .retryPolicy(retryPolicy)
-            .rewriteRules(backendService.rewrites())
-            .originStatsFactory(originStatsFactory)
-            .originsRestrictionCookieName(originRestrictionCookie)
-            .originIdHeader(environment.styxConfig().styxHeaderConfig().originIdHeaderName())
-            .overrideHostHeader(backendService.isOverrideHostHeader())
-            .build()
+        return StyxBackendServiceClient(
+            id = backendService.id(),
+            rewriteRules = backendService.rewrites(),
+            originStatsFactory = originStatsFactory,
+            originsRestrictionCookieName = originRestrictionCookie,
+            stickySessionConfig = backendService.stickySessionConfig(),
+            originIdHeader = environment.configuration().styxHeaderConfig().originIdHeaderName(),
+            loadBalancer = loadBalancingStrategy,
+            retryPolicy = retryPolicy,
+            metrics = environment.centralisedMetrics(),
+            overrideHostHeader = backendService.isOverrideHostHeader()
+        )
     }
 
     private fun decorateLoadBalancer(

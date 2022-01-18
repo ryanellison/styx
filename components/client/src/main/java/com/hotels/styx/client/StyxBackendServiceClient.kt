@@ -27,7 +27,6 @@ import reactor.core.publisher.Flux
 import com.hotels.styx.api.exceptions.NoAvailableHostsException
 import com.hotels.styx.api.ResponseEventListener
 import java.util.stream.Collectors
-import java.util.stream.StreamSupport
 import com.hotels.styx.api.RequestCookie
 import com.hotels.styx.api.extension.Origin
 import com.hotels.styx.api.extension.RemoteHost
@@ -35,28 +34,112 @@ import com.hotels.styx.api.extension.service.RewriteRule
 import com.hotels.styx.client.stickysession.StickySessionLoadBalancingStrategy
 import com.hotels.styx.client.stickysession.StickySessionCookie
 import com.hotels.styx.client.retry.RetryNTimes
-import com.hotels.styx.client.OriginStatsFactory.CachingOriginStatsFactory
 import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
 import java.lang.StringBuilder
 import java.util.Objects.nonNull
-import java.util.Objects.requireNonNull
 import java.util.Optional
 
 /**
  * A configurable HTTP client that uses connection pooling, load balancing, etc.
  */
-class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
-    private val id: Id = requireNonNull(builder.backendServiceId)
-    private val stickySessionConfig: StickySessionConfig = requireNonNull(builder.stickySessionConfig)
-    private val originStatsFactory: OriginStatsFactory = requireNonNull(builder.originStatsFactory)!!
-    private val loadBalancer: LoadBalancer = requireNonNull(builder.loadBalancer)!!
-    private val retryPolicy: RetryPolicy = builder.retryPolicy ?: RetryNTimes(3)
-    private val rewriteRuleset: RewriteRuleset = RewriteRuleset(builder.rewriteRules)
-    private val metrics: CentralisedMetrics? = builder.metrics
-    private val originsRestrictionCookieName: String? = builder.originsRestrictionCookieName
-    private val originIdHeader: CharSequence = builder.originIdHeader
-    private val overrideHostHeader: Boolean = builder.overrideHostHeader
+class StyxBackendServiceClient(
+    private val id: Id,
+    rewriteRules: List<RewriteRule>,
+    private val originStatsFactory: OriginStatsFactory,
+    private val originsRestrictionCookieName: String?,
+    private val stickySessionConfig: StickySessionConfig,
+    private val originIdHeader: CharSequence,
+    private val loadBalancer: LoadBalancer,
+    private val retryPolicy: RetryPolicy,
+    private val metrics: CentralisedMetrics,
+    private val overrideHostHeader: Boolean
+) : BackendServiceClient {
+
+    private constructor(builder: Builder): this(
+        id = builder.id!!,
+        rewriteRules = builder.rewriteRules!!,
+        originStatsFactory = builder.originStatsFactory!!,
+        originsRestrictionCookieName = builder.originsRestrictionCookieName,
+        stickySessionConfig = builder.stickySessionConfig!!,
+        originIdHeader = builder.originIdHeader!!,
+        loadBalancer = builder.loadBalancer!!,
+        retryPolicy = builder.retryPolicy!!,
+        metrics = builder.metrics!!,
+        overrideHostHeader = builder.overrideHostHeader!!
+    )
+
+    /**
+     * A builder for [StyxBackendServiceClient].
+     */
+    class Builder {
+        var id: Id? = null
+            private set
+        var rewriteRules: List<RewriteRule>? = emptyList()
+            private set
+        var originStatsFactory: OriginStatsFactory? = null
+            private set
+        var originsRestrictionCookieName: String? = null
+            private set
+        var stickySessionConfig: StickySessionConfig? = StickySessionConfig.stickySessionDisabled()
+            private set
+        var originIdHeader: CharSequence? = StyxHeaderConfig.ORIGIN_ID_DEFAULT
+            private set
+        var loadBalancer: LoadBalancer? = null
+            private set
+        var retryPolicy: RetryPolicy? = RetryNTimes(3)
+            private set
+        var metrics: CentralisedMetrics? = null
+            private set
+        var overrideHostHeader: Boolean? = false
+            private set
+
+
+        fun id(id: Id) = apply {
+            this.id = id
+        }
+
+        fun rewriteRules(rewriteRules: List<RewriteRule>) = apply {
+            this.rewriteRules = rewriteRules
+        }
+
+        fun originStatsFactory(originStatsFactory: OriginStatsFactory) = apply {
+            this.originStatsFactory = originStatsFactory
+        }
+
+        fun originsRestrictionCookieName(originsRestrictionCookieName: String) = apply {
+            this.originsRestrictionCookieName = originsRestrictionCookieName
+        }
+
+        fun stickySessionConfig(stickySessionConfig: StickySessionConfig) = apply {
+            this.stickySessionConfig = stickySessionConfig
+        }
+
+        fun originIdHeader(originIdHeader: CharSequence) = apply {
+            this.originIdHeader = originIdHeader
+        }
+
+        fun loadBalancer(loadBalancer: LoadBalancer) = apply {
+            this.loadBalancer = loadBalancer
+        }
+
+        fun retryPolicy(retryPolicy: RetryPolicy) = apply {
+            this.retryPolicy = retryPolicy
+        }
+
+        fun metrics(metrics: CentralisedMetrics) = apply {
+            this.metrics = metrics
+        }
+
+        fun overrideHostHeader(overrideHostHeader: Boolean) = apply {
+            this.overrideHostHeader = overrideHostHeader
+        }
+
+        fun build() = StyxBackendServiceClient(this)
+    }
+
+
+    private val rewriteRuleset: RewriteRuleset = RewriteRuleset(rewriteRules)
 
     override fun sendRequest(request: LiveHttpRequest, context: HttpInterceptor.Context): Publisher<LiveHttpResponse> {
         return sendRequest(rewriteUrl(request), emptyList(), 0, context)
@@ -114,7 +197,7 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
                 .doOnNext { response: LiveHttpResponse -> recordErrorStatusMetrics(response) }
                 .map { response: LiveHttpResponse -> removeUnexpectedResponseBody(updatedRequest, response) }
                 .map { response: LiveHttpResponse -> removeRedundantContentLengthHeader(response) }
-                .onErrorResume { cause: Throwable? ->
+                .onErrorResume { cause ->
                     val retryContext = RetryPolicyContext(id, attempt + 1, cause, updatedRequest, previousOrigins)
                     retry(updatedRequest, retryContext, newPreviousOrigins, attempt + 1, cause, context)
                 }
@@ -136,7 +219,7 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
         retryContext: RetryPolicyContext,
         previousOrigins: List<RemoteHost>,
         attempt: Int,
-        cause: Throwable?,
+        cause: Throwable,
         context: HttpInterceptor.Context
     ): Flux<LiveHttpResponse> {
         val lbContext: LoadBalancer.Preferences = object : LoadBalancer.Preferences {
@@ -164,48 +247,34 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
         private val request: LiveHttpRequest,
         private val previouslyUsedOrigins: Iterable<RemoteHost>
     ) : RetryPolicy.Context {
-        override fun appId(): Id {
-            return appId
-        }
+        override fun appId(): Id = appId
 
-        override fun currentRetryCount(): Int {
-            return retryCount
-        }
 
-        override fun lastException(): Optional<Throwable> {
-            return Optional.ofNullable(lastException)
-        }
+        override fun currentRetryCount(): Int = retryCount
 
-        override fun currentRequest(): LiveHttpRequest {
-            return request
-        }
 
-        override fun previousOrigins(): Iterable<RemoteHost> {
-            return previouslyUsedOrigins
-        }
+        override fun lastException(): Optional<Throwable> = Optional.ofNullable(lastException)
 
-        override fun toString(): String {
-            return StringBuilder(160)
-                .append(this.javaClass.simpleName)
-                .append("{appId=")
-                .append(appId)
-                .append(", retryCount=")
-                .append(retryCount)
-                .append(", lastException=")
-                .append(lastException)
-                .append(", request=")
-                .append(request.url())
-                .append(", previouslyUsedOrigins=")
-                .append(hosts(previouslyUsedOrigins))
-                .append('}')
+
+        override fun currentRequest(): LiveHttpRequest = request
+
+
+        override fun previousOrigins(): Iterable<RemoteHost> = previouslyUsedOrigins
+
+        override fun toString(): String =
+            StringBuilder()
+                .append("appId", appId)
+                .append(", retryCount", retryCount)
+                .append(", lastException", lastException)
+                .append(", request", request.url())
+                .append(", previouslyUsedOrigins", previouslyUsedOrigins)
                 .toString()
-        }
+
+        fun hosts(): String = hosts(previouslyUsedOrigins)
 
         companion object {
             private fun hosts(origins: Iterable<RemoteHost>): String {
-                return StreamSupport.stream(origins.spliterator(), false)
-                    .map { host: RemoteHost -> host.origin().hostAndPortString() }
-                    .collect(Collectors.joining(", "))
+                return origins.asSequence().map { it.origin().hostAndPortString() }.joinToString(", ")
             }
         }
     }
@@ -217,28 +286,24 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
         )
     }
 
-    private fun removeUnexpectedResponseBody(
-        request: LiveHttpRequest,
-        response: LiveHttpResponse
-    ): LiveHttpResponse {
-        return if (bodyNeedsToBeRemoved(request, response)) {
+    private fun removeUnexpectedResponseBody(request: LiveHttpRequest, response: LiveHttpResponse): LiveHttpResponse =
+        if (bodyNeedsToBeRemoved(request, response)) {
             responseWithoutBody(response)
         } else {
             response
         }
-    }
 
-    private fun removeRedundantContentLengthHeader(response: LiveHttpResponse): LiveHttpResponse {
-        return if (response.contentLength().isPresent && response.chunked()) {
+    private fun removeRedundantContentLengthHeader(response: LiveHttpResponse): LiveHttpResponse =
+        if (response.contentLength().isPresent && response.chunked()) {
             response.newBuilder()
                 .removeHeader(HttpHeaderNames.CONTENT_LENGTH)
                 .build()
         } else response
-    }
+
 
     private fun recordErrorStatusMetrics(response: LiveHttpResponse) {
         if (isError(response.status())) {
-            metrics!!.proxy.client.errorResponseFromOriginByStatus(response.status().code()).increment()
+            metrics.proxy.client.errorResponseFromOriginByStatus(response.status().code()).increment()
         }
     }
 
@@ -276,95 +341,15 @@ class StyxBackendServiceClient(builder: Builder) : BackendServiceClient {
         return rewriteRuleset.rewrite(request)
     }
 
-    override fun toString(): String {
-        return StringBuilder(160)
-            .append(this.javaClass.simpleName)
-            .append("{id=")
-            .append(id)
-            .append(", stickySessionConfig=")
-            .append(stickySessionConfig)
-            .append(", retryPolicy=")
-            .append(retryPolicy)
-            .append(", rewriteRuleset=")
-            .append(rewriteRuleset)
-            .append(", overrideHostHeader=")
-            .append(overrideHostHeader)
-            .append(", loadBalancer=")
-            .append(loadBalancer)
-            .append('}')
+    override fun toString(): String =
+        StringBuilder()
+            .append("id", id)
+            .append(", stickySessionConfig", stickySessionConfig)
+            .append(", retryPolicy", retryPolicy)
+            .append(", rewriteRuleset", rewriteRuleset)
+            .append(", loadBalancingStrategy", loadBalancer)
+            .append(", overrideHostHeader", overrideHostHeader)
             .toString()
-    }
-
-    /**
-     * A builder for [StyxBackendServiceClient].
-     */
-    class Builder(backendServiceId: Id) {
-        val backendServiceId: Id = requireNonNull(backendServiceId)
-        var metrics: CentralisedMetrics? = null
-        var rewriteRules: List<RewriteRule> = emptyList()
-        var retryPolicy: RetryPolicy? = RetryNTimes(3)
-        var loadBalancer: LoadBalancer? = null
-        var originStatsFactory: OriginStatsFactory? = null
-        var originsRestrictionCookieName: String? = null
-        var stickySessionConfig: StickySessionConfig = StickySessionConfig.stickySessionDisabled()
-        var originIdHeader: CharSequence = StyxHeaderConfig.ORIGIN_ID_DEFAULT
-        var overrideHostHeader: Boolean = false
-
-
-        fun stickySessionConfig(stickySessionConfig: StickySessionConfig): Builder {
-            this.stickySessionConfig = requireNonNull(stickySessionConfig)!!
-            return this
-        }
-
-        fun metrics(metrics: CentralisedMetrics): Builder {
-            this.metrics = requireNonNull(metrics)
-            return this
-        }
-
-        fun retryPolicy(retryPolicy: RetryPolicy): Builder {
-            this.retryPolicy = requireNonNull(retryPolicy)
-            return this
-        }
-
-        fun rewriteRules(rewriteRules: List<RewriteRule>): Builder {
-            this.rewriteRules = java.util.List.copyOf(rewriteRules)
-            return this
-        }
-
-        fun loadBalancer(loadBalancer: LoadBalancer): Builder {
-            this.loadBalancer = requireNonNull(loadBalancer)
-            return this
-        }
-
-        fun originStatsFactory(originStatsFactory: OriginStatsFactory): Builder {
-            this.originStatsFactory = originStatsFactory
-            return this
-        }
-
-        fun originsRestrictionCookieName(originsRestrictionCookieName: String): Builder {
-            this.originsRestrictionCookieName = originsRestrictionCookieName
-            return this
-        }
-
-        fun originIdHeader(originIdHeader: CharSequence): Builder {
-            this.originIdHeader = requireNonNull(originIdHeader)
-            return this
-        }
-
-        fun overrideHostHeader(overrideHostHeader: Boolean): Builder {
-            this.overrideHostHeader = overrideHostHeader
-            return this
-        }
-
-        fun build(): StyxBackendServiceClient {
-            if (originStatsFactory == null) {
-                originStatsFactory = CachingOriginStatsFactory(metrics)
-            }
-            checkNotNull(metrics) { "metrics property is required" }
-            return StyxBackendServiceClient(this)
-        }
-
-    }
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger(StyxBackendServiceClient::class.java)
