@@ -68,16 +68,6 @@ class StyxBackendServiceClient(
         overrideHostHeader = builder.overrideHostHeader
     )
 
-    companion object {
-        private val LOGGER = LoggerFactory.getLogger(StyxBackendServiceClient::class.java)
-        private const val MAX_RETRY_ATTEMPTS = 3
-        inline fun build(id: Id,
-                         originStatsFactory: OriginStatsFactory,
-                         loadBalancer: LoadBalancer,
-                         metrics: CentralisedMetrics,
-                         block: Builder.() -> Unit) = Builder(id,originStatsFactory,loadBalancer, metrics).apply(block).build()
-    }
-
     /**
      * A builder for [StyxBackendServiceClient].
      */
@@ -304,4 +294,14 @@ class StyxBackendServiceClient(
             .append(", loadBalancingStrategy", loadBalancer)
             .append(", overrideHostHeader", overrideHostHeader)
             .toString()
+
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(StyxBackendServiceClient::class.java)
+        private const val MAX_RETRY_ATTEMPTS = 3
+        inline fun build(id: Id,
+                         originStatsFactory: OriginStatsFactory,
+                         loadBalancer: LoadBalancer,
+                         metrics: CentralisedMetrics,
+                         block: Builder.() -> Unit) = Builder(id,originStatsFactory,loadBalancer, metrics).apply(block).build()
+    }
 }
