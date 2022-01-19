@@ -1,9 +1,12 @@
 /*
-  Copyright (C) 2013-2021 Expedia Inc.
+  Copyright (C) 2013-2022 Expedia Inc.
+
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
+
   http://www.apache.org/licenses/LICENSE-2.0
+
   Unless required by applicable law or agreed to in writing, software
   distributed under the License is distributed on an "AS IS" BASIS,
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +21,7 @@ import com.hotels.styx.api.extension.Origin
 import com.hotels.styx.api.extension.Origin.checkThatOriginsAreDistinct
 import java.lang.IllegalArgumentException
 import java.lang.StringBuilder
+import java.net.URI
 import java.util.Objects
 import java.util.Optional
 
@@ -52,15 +56,15 @@ class BackendService(
     }
 
     private constructor(builder: Builder): this(
-        id = builder.id,
-        path = builder.path,
-        connectionPoolSettings = builder.connectionPoolSettings,
+        id = requireNotNull(builder.id, { "id" }),
+        path = requireNotNull(builder.path, { "path" }),
+        connectionPoolSettings = requireNotNull(builder.connectionPoolSettings),
         origins = builder.origins,
-        healthCheckConfig = builder.healthCheckConfig,
-        stickySessionConfig = builder.stickySessionConfig,
-        rewrites = builder.rewrites,
+        healthCheckConfig = nullIfDisabled(builder.healthCheckConfig),
+        stickySessionConfig = requireNotNull(builder.stickySessionConfig),
+        rewrites = requireNotNull(builder.rewrites),
         overrideHostHeader = builder.overrideHostHeader,
-        responseTimeoutMillis = builder.responseTimeoutMillis,
+        responseTimeoutMillis = if (builder.responseTimeoutMillis == 0) DEFAULT_RESPONSE_TIMEOUT_MILLIS else builder.responseTimeoutMillis,
         maxHeaderSize = builder.maxHeaderSize,
         tlsSettings = builder.tlsSettings
     )
@@ -92,14 +96,92 @@ class BackendService(
             this.overrideHostHeader = backendService.overrideHostHeader
             this.responseTimeoutMillis = backendService.responseTimeoutMillis
             this.maxHeaderSize = backendService.maxHeaderSize
-            this.tlsSettings = backendService.tlsSettings
+            this.tlsSettings = backendService.tlsSettings().orElse(null)
+        }
+
+        fun id(id: Id) = apply {
+            this.id = id
+        }
+
+        fun id(id: String) = apply {
+            this.id = Id.id(id)
+        }
+
+        fun path(path: String) = apply {
+            this.path = checkValidPath(path)
+        }
+
+        private fun checkValidPath(path: String): String {
+            return try {
+                URI.create(path)
+                path
+            } catch (cause: Throwable) {
+                val message = String.format("Invalid path. Path='%s'", path)
+                throw IllegalArgumentException(message, cause)
+            }
+        }
+
+        fun origins(origins: Set<Origin>) = apply {
+            this.origins = origins
+        }
+
+        fun origins(vararg origins: Origin) = apply {
+            this.origins = mutableSetOf(*origins)
+        }
+
+        fun connectionPoolConfig(connectionPoolSettings: ConnectionPoolSettings) = apply {
+            this.connectionPoolSettings = connectionPoolSettings
+        }
+
+        fun stickySessionConfig(stickySessionConfig: StickySessionConfig) = apply {
+            this.stickySessionConfig = stickySessionConfig
+        }
+
+        fun healthCheckConfig(healthCheckConfig: HealthCheckConfig?) = apply {
+            this.healthCheckConfig = healthCheckConfig
+        }
+
+        fun rewrites(rewrites: List<RewriteConfig>) = apply {
+            this.rewrites = rewrites
+        }
+
+        fun overrideHostHeader(overrideHostHeader: Boolean) = apply {
+            this.overrideHostHeader = overrideHostHeader
+        }
+
+        fun responseTimeoutMillis(timeout: Int) = apply {
+            this.responseTimeoutMillis = timeout
+        }
+
+        fun maxHeaderSize(maxHeaderSize: Int) = apply {
+            this.maxHeaderSize = maxHeaderSize
+        }
+
+        /**
+         * Sets the https settings.
+         * For Jackson JSON serialiser that de-serialises from Option&lt;TlsSettings&gt;.
+         */
+        fun https(tlsSettings: Optional<TlsSettings?>) = apply {
+            this.tlsSettings = tlsSettings.orElse(null)
+        }
+
+        /**
+         * Sets the https settings.
+         * For programmatic use
+         */
+        fun httpsOld(tlsSettings: TlsSettings?) = apply {
+            this.tlsSettings = tlsSettings
+        }
+
+        /**
+         * Sets the https settings.
+         * For programmatic use
+         */
+        fun https(tlsSettings: TlsSettings?) = apply {
+            this.tlsSettings = tlsSettings
         }
 
         fun build() = BackendService(this)
-    }
-
-    private fun nullIfDisabled(healthCheckConfig: HealthCheckConfig?): HealthCheckConfig? {
-        return if (healthCheckConfig != null && healthCheckConfig.isEnabled) healthCheckConfig else null
     }
 
     override fun id(): Id = id
@@ -208,13 +290,17 @@ class BackendService(
         const val DEFAULT_RESPONSE_TIMEOUT_MILLIS = 1000
         const val USE_DEFAULT_MAX_HEADER_SIZE = 0
 
-        inline fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
+        //inline fun build(block: Builder.() -> Unit) = Builder().apply(block).build()
 
-        fun newBackendServiceBuilder(): Builder {
+        fun nullIfDisabled(healthCheckConfig: HealthCheckConfig?): HealthCheckConfig? {
+            return if (healthCheckConfig != null && healthCheckConfig.isEnabled) healthCheckConfig else null
+        }
+
+        @JvmStatic fun newBackendServiceBuilder(): Builder {
             return Builder()
         }
 
-        fun newBackendServiceBuilder(backendService: BackendService): Builder {
+        @JvmStatic fun newBackendServiceBuilder(backendService: BackendService): Builder {
             return Builder(backendService)
         }
     }

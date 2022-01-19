@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2013-2021 Expedia Inc.
+  Copyright (C) 2013-2022 Expedia Inc.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ internal class OriginsConfigConverter(
                 val serviceName = "$appId-monitor"
                 val healthCheckConfig = it.healthCheckConfig()
 
-                Pair(serviceName, healthCheckService(serviceName, appId, healthCheckConfig))
+                Pair(serviceName, healthCheckService(serviceName, appId, healthCheckConfig!!))
             }
 
     internal fun healthCheckService(serviceName: String, appId: String, healthCheckConfig: HealthCheckConfig): ProviderObjectRecord {
@@ -185,8 +185,8 @@ internal class OriginsConfigConverter(
 
         private fun isHealthCheckConfigured(app: BackendService): Boolean {
             return (app.healthCheckConfig() != null
-                    && app.healthCheckConfig().uri().isPresent
-                    && app.healthCheckConfig().isEnabled)
+                    && app.healthCheckConfig()!!.uri().isPresent
+                    && app.healthCheckConfig()!!.isEnabled)
         }
 
         private fun loadBalancingGroupConfig(origins: String,

@@ -1,9 +1,12 @@
 /*
-  Copyright (C) 2013-2021 Expedia Inc.
+  Copyright (C) 2013-2022 Expedia Inc.
+
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
   You may obtain a copy of the License at
+
   http://www.apache.org/licenses/LICENSE-2.0
+
   Unless required by applicable law or agreed to in writing, software
   distributed under the License is distributed on an "AS IS" BASIS,
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,20 +47,11 @@ class StyxBackendServiceClientFactory(    // Todo: This can be package private i
         val originRestrictionCookie = styxConfig["originRestrictionCookie"].orElse(null)
         val stickySessionEnabled = backendService.stickySessionConfig().stickySessionEnabled()
         val retryPolicy = ServiceProvision.loadRetryPolicy(
-            styxConfig,
-            environment,
-            "retrypolicy.policy.factory",
-            RetryPolicy::class.java
-        )
-            .orElseGet {
-                defaultRetryPolicy(
-                    environment
-                )
-            }
+            styxConfig, environment, "retrypolicy.policy.factory", RetryPolicy::class.java
+        ).orElseGet { defaultRetryPolicy() }
         val configuredLbStrategy = ServiceProvision.loadLoadBalancer(
             styxConfig, environment, "loadBalancing.strategy.factory", LoadBalancer::class.java, originsInventory
-        )
-            .orElseGet { BusyConnectionsStrategy(originsInventory) }
+        ).orElseGet { BusyConnectionsStrategy(originsInventory) }
 
         // TODO: Ensure that listeners are also unregistered:
         // We are going to revamp how we handle origins, https://github.com/HotelsDotCom/styx/issues/197
@@ -87,30 +81,26 @@ class StyxBackendServiceClientFactory(    // Todo: This can be package private i
         stickySessionEnabled: Boolean,
         originsInventory: OriginsInventory,
         originRestrictionCookie: String?
-    ): LoadBalancer {
-        return when {
-            stickySessionEnabled -> {
-                StickySessionLoadBalancingStrategy(originsInventory, configuredLbStrategy)
-            }
-            originRestrictionCookie == null -> {
-                LOGGER.info("originRestrictionCookie not specified - origin restriction disabled")
-                configuredLbStrategy
-            }
-            else -> {
-                LOGGER.info(
-                    "originRestrictionCookie specified as {} - origin restriction will apply when this cookie is sent",
-                    originRestrictionCookie
-                )
-                OriginRestrictionLoadBalancingStrategy(originsInventory, configuredLbStrategy)
-            }
+    ): LoadBalancer =
+        if (stickySessionEnabled) {
+            StickySessionLoadBalancingStrategy(originsInventory, configuredLbStrategy)
+        } else if (originRestrictionCookie == null) {
+            LOGGER.info("originRestrictionCookie not specified - origin restriction disabled")
+            configuredLbStrategy
+        } else {
+            LOGGER.info(
+                "originRestrictionCookie specified as {} - origin restriction will apply when this cookie is sent",
+                originRestrictionCookie
+            )
+            OriginRestrictionLoadBalancingStrategy(originsInventory, configuredLbStrategy)
         }
-    }
+
 
     companion object {
         private val LOGGER = LoggerFactory.getLogger(BackendServiceClientFactory::class.java)
-        private fun defaultRetryPolicy(environment: com.hotels.styx.api.Environment): RetryPolicy {
+        private fun defaultRetryPolicy(): RetryPolicy {
             val retryOnce = RetryNTimes(1)
-            LOGGER.warn("No configured retry policy found in {}. Using {}", environment.configuration(), retryOnce)
+            LOGGER.warn("No configured retry policy found, using {}", retryOnce)
             return retryOnce
         }
     }
