@@ -29,7 +29,7 @@ import java.util.Optional
  * Represents the configuration of an application (i.e. a backend service) that Styx can proxy to.
  */
 class BackendService(
-    private val id: Id,
+    private val id: String,
     private val path: String,
     private val connectionPoolSettings: ConnectionPoolSettings,
     private val origins: Set<Origin>,
@@ -73,7 +73,7 @@ class BackendService(
      * A builder for [BackendService].
      */
     class Builder(
-        var id: Id = Id.GENERIC_APP,
+        var id: String = Id.GENERIC_APP.toString(),
         var path: String = "/",
         var origins: Set<Origin> = emptySet(),
         var connectionPoolSettings: ConnectionPoolSettings = ConnectionPoolSettings.defaultConnectionPoolSettings(),
@@ -100,11 +100,11 @@ class BackendService(
         }
 
         fun id(id: Id) = apply {
-            this.id = id
+            this.id = id.toString()
         }
 
         fun id(id: String) = apply {
-            this.id = Id.id(id)
+            this.id = id
         }
 
         fun path(path: String) = apply {
@@ -184,7 +184,7 @@ class BackendService(
         fun build() = BackendService(this)
     }
 
-    override fun id(): Id = id
+    override fun id(): Id = Id.id(id)
 
 
     fun idAsString(): String = id.toString()
