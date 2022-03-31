@@ -411,4 +411,3 @@ private fun yamlConfig(text: String) =
                 .format(YAML)
                 .build()
                 .parse(configSource(text))
-
