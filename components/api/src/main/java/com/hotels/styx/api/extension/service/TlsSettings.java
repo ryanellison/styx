@@ -19,6 +19,7 @@ package com.hotels.styx.api.extension.service;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -222,6 +223,20 @@ public class TlsSettings {
          */
         public Builder additionalCerts(Certificate... certificates) {
             this.additionalCerts = Set.of(certificates);
+            return this;
+        }
+
+        /**
+         * Configures additional certificates.
+         *
+         * The additional certificates are loaded into the java keystore that has been
+         * initialised from the trust store file.
+         *
+         * @param certificates
+         * @return
+         */
+        public Builder additionalCerts(Set<Certificate> certificates) {
+            this.additionalCerts = new HashSet<>(certificates);
             return this;
         }
 

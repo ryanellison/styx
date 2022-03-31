@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -220,6 +221,11 @@ public final class HttpsConnectorConfig extends HttpConnectorConfig {
 
         public Builder protocols(String... protocols) {
             this.protocols = List.of(protocols);
+            return this;
+        }
+
+        public Builder protocols(List<String> protocols) {
+            this.protocols = new ArrayList<>(protocols);
             return this;
         }
 
