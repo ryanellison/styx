@@ -37,13 +37,15 @@ class KHealthCheckConfig(val uri: String?,
             .build()
 
     companion object {
-        fun fromJava(from: com.hotels.styx.api.extension.service.HealthCheckConfig): KHealthCheckConfig =
-            KHealthCheckConfig(
-                uri = from.uri().orElse(null),
-                interval = Duration.ofMillis(from.intervalMillis()),
-                timeout = Duration.ofMillis(from.timeoutMillis()),
-                healthyThreshold = from.healthyThreshold(),
-                unhealthyThreshold = from.unhealthyThreshold()
-            )
+        fun fromJava(from: com.hotels.styx.api.extension.service.HealthCheckConfig?): KHealthCheckConfig? =
+            from ?.let {
+                KHealthCheckConfig(
+                    uri = from.uri().orElse(null),
+                    interval = Duration.ofMillis(from.intervalMillis()),
+                    timeout = Duration.ofMillis(from.timeoutMillis()),
+                    healthyThreshold = from.healthyThreshold(),
+                    unhealthyThreshold = from.unhealthyThreshold()
+                )
+            }
     }
 }
